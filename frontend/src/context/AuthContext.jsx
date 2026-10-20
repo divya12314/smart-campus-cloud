@@ -1,33 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { authService } from '../services/authService';
+import { setAccessToken } from '../services/api';
 import { mockUsers } from '../services/mockData';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('smart_campus_user');
-    return saved ? JSON.parse(saved) : mockUsers.student; // Defaults to student for frictionless instant preview
-  });
+  const [user, setUser] = useState(null);
 
-  const [token, setToken] = useState(() => localStorage.getItem('smart_campus_jwt') || 'demo-jwt-token');
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('smart_campus_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('smart_campus_user');
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('smart_campus_jwt', token);
-    } else {
-      localStorage.removeItem('smart_campus_jwt');
-    }
-  }, [token]);
 
   const login = async (email, password) => {
     setLoading(true);
@@ -36,17 +19,25 @@ export const AuthProvider = ({ children }) => {
       if (res.success && res.data) {
         setUser(res.data);
         setToken(res.data.token);
+        setAccessToken(res.data.token);
         return { success: true, user: res.data };
       }
       throw new Error(res.message || 'Login failed');
     } catch (err) {
-      console.warn('Backend login fallback to mock demo user');
+      if (err.response) {
+        setUser(null);
+        setToken(null);
+        setAccessToken(null);
+        return { success: false, message: err.response.data?.message || 'Login failed. Please check your credentials or try again later.' };
+      }
+      console.warn('Backend unavailable; using mock demo user');
       // Fallback matching
       let mock = mockUsers.student;
       if (email.includes('admin')) mock = mockUsers.admin;
       else if (email.includes('faculty')) mock = mockUsers.faculty;
       setUser(mock);
       setToken(mock.token);
+      setAccessToken(mock.token);
       return { success: true, user: mock };
     } finally {
       setLoading(false);
@@ -60,10 +51,14 @@ export const AuthProvider = ({ children }) => {
       if (res.success && res.data) {
         setUser(res.data);
         setToken(res.data.token);
+        setAccessToken(res.data.token);
         return { success: true, user: res.data };
       }
       throw new Error(res.message || 'Registration failed');
     } catch (err) {
+      if (err.response) {
+        return { success: false, message: err.response.data?.message || 'Registration failed. Please try again.' };
+      }
       // Mock registration fallback
       const newUser = {
         ...mockUsers.student,
@@ -74,6 +69,7 @@ export const AuthProvider = ({ children }) => {
       };
       setUser(newUser);
       setToken(newUser.token);
+      setAccessToken(newUser.token);
       return { success: true, user: newUser };
     } finally {
       setLoading(false);
@@ -81,10 +77,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Send revocation while the current token is still available to the API client.
+    if (token && !String(token).startsWith('mock-') && token !== 'demo-jwt-token') {
+      authService.logout(token).catch(() => {});
+    }
+    setAccessToken(null);
     setUser(null);
     setToken(null);
     localStorage.removeItem('smart_campus_user');
-    localStorage.removeItem('smart_campus_jwt');
   };
 
   // Quick switch for examiners / demo
@@ -92,6 +92,7 @@ export const AuthProvider = ({ children }) => {
     const target = mockUsers[roleType] || mockUsers.student;
     setUser(target);
     setToken(target.token);
+    setAccessToken(target.token);
   };
 
   const isStudent = user?.role === 'ROLE_STUDENT';
