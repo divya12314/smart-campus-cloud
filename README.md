@@ -338,10 +338,10 @@ docker compose up --build
 ```bash
 cd backend
 
-# Run with Maven (Using H2 in-memory or local MySQL)
-mvn spring-boot:run
+# Run with Maven and explicitly enable sample data for local demos
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
-*Backend starts on `http://localhost:8080` with automatic sample data seeding.*
+*Backend starts on `http://localhost:8080`. Demo seed data is loaded only when the `dev` Spring profile is active. Without that profile, sample admin/faculty/student accounts are not created.*
 
 ### Frontend (React):
 ```bash
@@ -435,15 +435,13 @@ Every push and pull request triggers `.github/workflows/ci.yml`:
 
 ---
 
-## 18. Default Demo Credentials (LOCAL DEVELOPMENT ONLY)
+## 18. Demo Mode and Local-Only Accounts
 
-| Role | Email Address | Password | Name |
-| :--- | :--- | :--- | :--- |
-| **Student** | `student@campus.edu` | `Student@123` | Alex Johnson (CSE Sem 6) |
-| **Faculty** | `faculty@campus.edu` | `Faculty@123` | Dr. Alan Turing (Assoc. Prof) |
-| **Admin** | `admin@campus.edu` | `Admin@123` | Campus Administrator |
+Demo accounts are created by the backend seed initializer only when the `dev` Spring profile is explicitly enabled. Their login details are intentionally not published here. Use only disposable local databases for demos.
 
-> 💡 *Tip: The web interface includes a top navigation **"Switch Demo Role"** and login **"Instant Demo Evaluation"** buttons for frictionless viva demonstrations!*
+For a local UI walkthrough, set `VITE_DEMO_MODE=true` in the frontend environment before building. This enables mock fallback and demo-only login/role-switch controls. Keep `VITE_DEMO_MODE=false` (or unset) for staging and production builds. Run the backend with `SPRING_PROFILES_ACTIVE=dev` only in local development; do not enable this profile against production data.
+
+The frontend flag controls demo UI only and is not a security boundary. The production backend must still use real authentication and authorization.
 
 ---
 
